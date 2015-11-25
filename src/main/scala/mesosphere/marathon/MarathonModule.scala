@@ -20,6 +20,7 @@ import mesosphere.chaos.http.HttpConf
 import mesosphere.marathon.Protos.MarathonTask
 import mesosphere.marathon.api.LeaderInfo
 import mesosphere.marathon.core.launchqueue.LaunchQueue
+import mesosphere.marathon.core.leadership.LeadershipCoordinator
 import mesosphere.marathon.event.http._
 import mesosphere.marathon.event.{ EventModule, HistoryActor }
 import mesosphere.marathon.health.{ HealthCheckManager, MarathonHealthCheckManager }
@@ -34,15 +35,17 @@ import mesosphere.util.state.mesos.MesosStateStore
 import mesosphere.util.state.zk.{ CompressionConf, ZKStore }
 import mesosphere.util.state.{ FrameworkId, FrameworkIdUtil, PersistentStore, _ }
 import org.apache.mesos.state.ZooKeeperState
-import org.apache.zookeeper.ZooDefs
 import org.apache.zookeeper.ZooDefs.Ids
+import org.apache.zookeeper.{ WatchedEvent, Watcher, ZooDefs }
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
+import scala.collection.immutable.Seq
 import scala.concurrent.Await
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
-import scala.collection.immutable.Seq
+
+//scalastyle:off number.of.methods parameter.number
 
 object ModuleNames {
   final val CANDIDATE = "CANDIDATE"
@@ -83,7 +86,6 @@ class MarathonModule(conf: MarathonConf, http: HttpConf, zk: ZooKeeperClient)
     bind(classOf[SchedulerDriverFactory]).to(classOf[MesosSchedulerDriverFactory]).in(Scopes.SINGLETON)
     bind(classOf[MarathonLeaderInfoMetrics]).in(Scopes.SINGLETON)
     bind(classOf[MarathonScheduler]).in(Scopes.SINGLETON)
-    bind(classOf[MarathonSchedulerService]).in(Scopes.SINGLETON)
     bind(classOf[LeaderInfo]).to(classOf[MarathonLeaderInfo]).in(Scopes.SINGLETON)
     bind(classOf[TaskFactory]).to(classOf[DefaultTaskFactory]).in(Scopes.SINGLETON)
 
@@ -101,6 +103,41 @@ class MarathonModule(conf: MarathonConf, http: HttpConf, zk: ZooKeeperClient)
     bind(classOf[AtomicBoolean])
       .annotatedWith(Names.named(ModuleNames.LEADER_ATOMIC_BOOLEAN))
       .toInstance(leader)
+  }
+
+  @Provides
+  @Singleton
+  def provideMarathonSchedulerService(
+    zk: ZooKeeperClient,
+    leadershipCoordinator: LeadershipCoordinator,
+    healthCheckManager: HealthCheckManager,
+    @Named(ModuleNames.CANDIDATE) candidate: Option[Candidate],
+    config: MarathonConf,
+    frameworkIdUtil: FrameworkIdUtil,
+    @Named(ModuleNames.LEADER_ATOMIC_BOOLEAN) leader: AtomicBoolean,
+    appRepository: AppRepository,
+    taskTracker: TaskTracker,
+    driverFactory: SchedulerDriverFactory,
+    system: ActorSystem,
+    migration: Migration,
+    @Named("schedulerActor") schedulerActor: ActorRef,
+    @Named(EventModule.busName) eventStream: EventStream,
+    leadershipCallbacks: Seq[LeadershipCallback] = Seq.empty): MarathonSchedulerService = {
+
+    val service = new MarathonSchedulerService(leadershipCoordinator, healthCheckManager, candidate, config,
+      frameworkIdUtil, leader, appRepository, taskTracker, driverFactory, system, migration, schedulerActor,
+      eventStream, leadershipCallbacks)
+
+    // The current candidate implementation does not handle ZK connection loss
+    // We register a listener on the candidate zk connection and handle disconnetions explicitly
+    zk.get().register(new Watcher {
+      override def process(event: WatchedEvent): Unit = event.getState match {
+        case Watcher.Event.KeeperState.Disconnected if leader.get() => service.abdicateLeadership()
+        case _ =>
+      }
+    })
+
+    service
   }
 
   @Provides
