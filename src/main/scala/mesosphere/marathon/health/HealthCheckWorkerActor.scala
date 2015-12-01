@@ -75,7 +75,7 @@ class HealthCheckWorkerActor extends Actor with ActorLogging {
     }
 
   def http(task: MarathonTask, check: HealthCheck, port: Int): Future[Option[HealthResult]] = {
-    val host = MarathonTasks.hostAddress(task)
+    val host = MarathonTasks.effectiveIpAddress(task)
     val rawPath = check.path.getOrElse("")
     val absolutePath = if (rawPath.startsWith("/")) rawPath else s"/$rawPath"
     val url = s"http://$host:$port$absolutePath"
@@ -101,7 +101,7 @@ class HealthCheckWorkerActor extends Actor with ActorLogging {
   }
 
   def tcp(task: MarathonTask, check: HealthCheck, port: Int): Future[Option[HealthResult]] = {
-    val host = MarathonTasks.hostAddress(task)
+    val host = MarathonTasks.effectiveIpAddress(task)
     val address = s"$host:$port"
     val timeoutMillis = check.timeout.toMillis.toInt
     log.debug("Checking the health of [{}] via TCP", address)
@@ -116,7 +116,7 @@ class HealthCheckWorkerActor extends Actor with ActorLogging {
   }
 
   def https(task: MarathonTask, check: HealthCheck, port: Int): Future[Option[HealthResult]] = {
-    val host = MarathonTasks.hostAddress(task)
+    val host = MarathonTasks.effectiveIpAddress(task)
     val rawPath = check.path.getOrElse("")
     val absolutePath = if (rawPath.startsWith("/")) rawPath else s"/$rawPath"
     val url = s"https://$host:$port$absolutePath"

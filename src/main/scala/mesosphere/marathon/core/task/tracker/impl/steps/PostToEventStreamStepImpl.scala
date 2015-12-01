@@ -62,7 +62,7 @@ class PostToEventStreamStepImpl @Inject() (
         if (status.hasMessage) status.getMessage else "",
         appId,
         task.getHost,
-        MarathonTasks.hostAddress(task),
+        MarathonTasks.ipAddresses(task),
         task.getPortsList.asScala,
         task.getVersion,
         timestamp = timestamp.toString

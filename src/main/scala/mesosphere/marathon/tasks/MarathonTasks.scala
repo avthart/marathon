@@ -8,7 +8,6 @@ import org.apache.mesos.Protos.Attribute
 import scala.collection.JavaConverters._
 
 object MarathonTasks {
-
   /*
    * Despite its name, stagedAt is set on task creation and before the TASK_STAGED notification from Mesos. This is
    * important because we periodically check for any tasks with an old stagedAt timestamp and kill them (See
@@ -33,29 +32,19 @@ object MarathonTasks {
       .build
   }
 
-  /**
-    * Returns the host address of the supplied task as a string.
-    *
-    * If the supplied task has at least one NetworkInfo with an IP address
-    * filled in, this function returns the first such address.
-    *
-    * In all other cases, this function returns the slave host address.
-    */
-  def hostAddress(task: MarathonTask): String = {
-    // First, look for an assigned container address.
-    val containerAddress: Option[String] =
-      if (task.getNetworksCount > 0) {
-        // Take the first element with an IP address for now,
-        // since Marathon doesn't know how to deal with multiple addresses.
-        task.getNetworksList
-          .asScala
-          .find(_.getIpAddressesCount > 0)
-          .map(_.getIpAddresses(0).getIpAddress)
-      }
-      else None
-
-    // fall back to the slave host address
-    containerAddress getOrElse task.getHost
+  def ipAddresses(task: MarathonTask): Seq[Protos.NetworkInfo.IPAddress] = {
+    task.getNetworksList.asScala.flatMap(_.getIpAddressesList.asScala.toList)
   }
 
+  /**
+   * Returns the IP address (as string) to use connect to the task.
+   *
+   * If the supplied task has at least one NetworkInfo with an IP address
+   * filled in, this function returns the first such address.
+   *
+   * In all other cases, this function returns the slave host address.
+   */
+  def effectiveIpAddress(task: MarathonTask): String = {
+    ipAddresses(task).map(_.getIpAddress).headOption.getOrElse(task.getHost)
+  }
 }

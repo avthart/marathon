@@ -70,15 +70,19 @@ trait Formats
   }
 
   implicit lazy val MarathonTaskWrites: Writes[MarathonTask] = Writes { task =>
-    val containerAddress = {
-      val result = MarathonTasks.hostAddress(task)
-      if (result.nonEmpty) JsString(result) else JsNull
-    }
+    val ipAddresses = JsArray(
+      MarathonTasks.ipAddresses(task).map { ipAddress =>
+        Json.obj(
+          "ipAddress" -> ipAddress.getIpAddress,
+          "protocol" -> ipAddress.getProtocol.name
+        )
+      }
+    )
 
     Json.obj(
       "id" -> task.getId,
       "host" -> (if (task.hasHost) task.getHost else JsNull),
-      "containerAddress" -> containerAddress,
+      "ipAddresses" -> ipAddresses,
       "ports" -> task.getPortsList.asScala,
       "startedAt" -> (if (task.getStartedAt != 0) Timestamp(task.getStartedAt) else JsNull),
       "stagedAt" -> (if (task.getStagedAt != 0) Timestamp(task.getStagedAt) else JsNull),
