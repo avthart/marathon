@@ -9,12 +9,13 @@ import mesosphere.marathon.core.appinfo._
 import mesosphere.marathon.event._
 import mesosphere.marathon.event.http.EventSubscribers
 import mesosphere.marathon.health.{ Health, HealthCheck }
-import mesosphere.marathon.tasks.MarathonTasks
 import mesosphere.marathon.state.Container.Docker.PortMapping
 import mesosphere.marathon.state.Container.{ Docker, Volume }
 import mesosphere.marathon.state._
+import mesosphere.marathon.tasks.MarathonTasks
 import mesosphere.marathon.upgrade._
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo
+import org.apache.mesos.Protos.NetworkInfo
 import org.apache.mesos.{ Protos => mesos }
 import play.api.data.validation.ValidationError
 import play.api.libs.functional.syntax._
@@ -69,20 +70,43 @@ trait Formats
     )
   }
 
-  implicit lazy val MarathonTaskWrites: Writes[MarathonTask] = Writes { task =>
-    val ipAddresses = JsArray(
-      MarathonTasks.ipAddresses(task).map { ipAddress =>
-        Json.obj(
-          "ipAddress" -> ipAddress.getIpAddress,
-          "protocol" -> ipAddress.getProtocol.name
-        )
-      }
-    )
+  implicit lazy val networkInfoProtocolWrites = Writes[mesos.NetworkInfo.Protocol] { protocol =>
+    JsString(protocol.getDescriptorForType.getName)
+  }
 
+  private[this] val allowedProtocolString =
+    mesos.NetworkInfo.Protocol.values().toSeq.map(_.getDescriptorForType.getName).mkString(", ")
+
+  implicit lazy val networkInfoProtocolReads = Reads[mesos.NetworkInfo.Protocol] { json =>
+    json.validate[String].flatMap { protocolString: String =>
+
+      Option(mesos.NetworkInfo.Protocol.valueOf(protocolString)) match {
+        case Some(protocol) => JsSuccess(protocol)
+        case None =>
+          JsError(s"'$protocolString' is not a valid protocol. Allowed values: $allowedProtocolString")
+      }
+
+    }
+  }
+
+  implicit lazy val ipAddressFormat: Format[mesos.NetworkInfo.IPAddress] = {
+    def toIpAddress(ipAddress: String, protocol: mesos.NetworkInfo.Protocol): mesos.NetworkInfo.IPAddress =
+      mesos.NetworkInfo.IPAddress.newBuilder().setIpAddress(ipAddress).setProtocol(protocol).build()
+
+    def toTuple(ipAddress: mesos.NetworkInfo.IPAddress): (String, mesos.NetworkInfo.Protocol) =
+      (ipAddress.getIpAddress, ipAddress.getProtocol)
+
+    (
+      (__ \ "ipAddress").format[String] ~
+      (__ \ "protocol").format[mesos.NetworkInfo.Protocol]
+    )(toIpAddress, toTuple)
+  }
+
+  implicit lazy val MarathonTaskWrites: Writes[MarathonTask] = Writes { task =>
     Json.obj(
       "id" -> task.getId,
       "host" -> (if (task.hasHost) task.getHost else JsNull),
-      "ipAddresses" -> ipAddresses,
+      "ipAddresses" -> MarathonTasks.ipAddresses(task),
       "ports" -> task.getPortsList.asScala,
       "startedAt" -> (if (task.getStartedAt != 0) Timestamp(task.getStartedAt) else JsNull),
       "stagedAt" -> (if (task.getStagedAt != 0) Timestamp(task.getStagedAt) else JsNull),

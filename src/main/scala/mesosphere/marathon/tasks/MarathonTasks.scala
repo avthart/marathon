@@ -37,13 +37,13 @@ object MarathonTasks {
   }
 
   /**
-   * Returns the IP address (as string) to use connect to the task.
-   *
-   * If the supplied task has at least one NetworkInfo with an IP address
-   * filled in, this function returns the first such address.
-   *
-   * In all other cases, this function returns the slave host address.
-   */
+    * Returns the IP address (as string) to use connect to the task.
+    *
+    * If the supplied task has at least one NetworkInfo with an IP address
+    * filled in, this function returns the first such address.
+    *
+    * In all other cases, this function returns the slave host address.
+    */
   def effectiveIpAddress(task: MarathonTask): String = {
     ipAddresses(task).map(_.getIpAddress).headOption.getOrElse(task.getHost)
   }

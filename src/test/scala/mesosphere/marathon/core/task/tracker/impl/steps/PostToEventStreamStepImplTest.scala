@@ -39,15 +39,15 @@ class PostToEventStreamStepImplTest extends FunSuite with Matchers with GivenWhe
     events should have size 1
     events should be (Seq(
       MesosStatusUpdateEvent(
-        slaveId.getValue,
-        taskId.getValue,
-        status.getState.name,
-        taskStatusMessage,
-        appId,
-        host,
-        host,
-        portsList.asJava.asScala,
-        version.toString,
+        slaveId = slaveId.getValue,
+        taskId = taskId.getValue,
+        taskStatus = status.getState.name,
+        message = taskStatusMessage,
+        appId = appId,
+        host = host,
+        ipAddresses = Nil,
+        ports = portsList.asJava.asScala,
+        version = version.toString,
         timestamp = updateTimestamp.toString
       )
     ))
@@ -106,15 +106,15 @@ class PostToEventStreamStepImplTest extends FunSuite with Matchers with GivenWhe
     events should have size 1
     events should be (Seq(
       MesosStatusUpdateEvent(
-        slaveId.getValue,
-        taskId.getValue,
-        status.getState.name,
-        taskStatusMessage,
-        appId,
-        host,
-        host,
-        portsList.asJava.asScala,
-        version.toString,
+        slaveId = slaveId.getValue,
+        taskId = taskId.getValue,
+        taskStatus = status.getState.name,
+        message = taskStatusMessage,
+        appId = appId,
+        host = host,
+        ipAddresses = Nil,
+        ports = portsList.asJava.asScala,
+        version = version.toString,
         timestamp = updateTimestamp.toString
       )
     ))

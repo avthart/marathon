@@ -57,18 +57,18 @@ class MarathonTasksTest extends MarathonSpec with Matchers {
 
   test("Compute hostAddress for legacy MarathonTask instances") {
     val f = new Fixture
-    MarathonTasks.hostAddress(f.task1) should equal ("agent1.mesos")
+    MarathonTasks.effectiveIpAddress(f.task1) should equal ("agent1.mesos")
   }
 
   test("Compute hostAddress for MarathonTask instances with one NetworkInfo") {
     val f = new Fixture
-    MarathonTasks.hostAddress(f.task2) should equal ("123.123.123.123")
+    MarathonTasks.effectiveIpAddress(f.task2) should equal ("123.123.123.123")
   }
 
   test("Compute hostAddress for MarathonTask instances with multiple NetworkInfos") {
     val f = new Fixture
-    MarathonTasks.hostAddress(f.task3) should equal ("123.123.123.123")
-    MarathonTasks.hostAddress(f.task4) should equal ("agent1.mesos")
+    MarathonTasks.effectiveIpAddress(f.task3) should equal ("123.123.123.123")
+    MarathonTasks.effectiveIpAddress(f.task4) should equal ("agent1.mesos")
   }
 
 }
