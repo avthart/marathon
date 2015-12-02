@@ -113,6 +113,7 @@ class AppDefinitionTest extends MarathonSpec with Matchers {
     val app = AppDefinition(
       id = "app-with-ip-address".toPath,
       cmd = Some("sleep 30"),
+      ports = Nil,
       ipAddress = Some(
         IpAddress(
           groups = Seq("a", "b", "c"),

@@ -242,6 +242,7 @@ class TaskBuilderTest extends MarathonSpec with Matchers {
         cpus = 1.0,
         mem = 64.0,
         disk = 1.0,
+        ports = Nil,
         ipAddress = Some(
           IpAddress(
             groups = Seq("a", "b", "c"),
@@ -291,6 +292,7 @@ class TaskBuilderTest extends MarathonSpec with Matchers {
         mem = 64.0,
         disk = 1.0,
         executor = "/custom/executor",
+        ports = Nil,
         ipAddress = Some(
           IpAddress(
             groups = Seq("a", "b", "c"),

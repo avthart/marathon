@@ -458,7 +458,6 @@ trait V2Formats {
       (__ \ "constraints").readNullable[Set[Constraint]].withDefault(AppDefinition.DefaultConstraints) ~
       (__ \ "uris").readNullable[Seq[String]].withDefault(AppDefinition.DefaultUris) ~
       (__ \ "storeUrls").readNullable[Seq[String]].withDefault(AppDefinition.DefaultStoreUrls) ~
-      (__ \ "ports").readNullable[Seq[Integer]](uniquePorts).withDefault(AppDefinition.DefaultPorts) ~
       (__ \ "requirePorts").readNullable[Boolean].withDefault(AppDefinition.DefaultRequirePorts) ~
       (__ \ "backoffSeconds").readNullable[Long].withDefault(AppDefinition.DefaultBackoff.toSeconds).asSeconds ~
       (__ \ "backoffFactor").readNullable[Double].withDefault(AppDefinition.DefaultBackoffFactor) ~
@@ -467,9 +466,20 @@ trait V2Formats {
       (__ \ "container").readNullable[Container] ~
       (__ \ "healthChecks").readNullable[Set[HealthCheck]].withDefault(AppDefinition.DefaultHealthChecks) ~
       (__ \ "dependencies").readNullable[Set[PathId]].withDefault(AppDefinition.DefaultDependencies)
-    )(V2AppDefinition(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _)).flatMap { app =>
+    )((
+        id, cmd, args, maybeString, env, instances, cpus, mem, disk, executor, constraints, uris, storeUrls,
+        requirePorts, backoff, backoffFactor, maxLaunchDelay, container, checks, dependencies
+      ) => V2AppDefinition(
+        id = id, cmd = cmd, args = args, user = maybeString, env = env, instances = instances, cpus = cpus,
+        mem = mem, disk = disk, executor = executor, constraints = constraints, uris = uris,
+        storeUrls = storeUrls, ports = Nil,
+        requirePorts = requirePorts, backoff = backoff,
+        backoffFactor = backoffFactor, maxLaunchDelay = maxLaunchDelay, container = container, healthChecks = checks,
+        dependencies = dependencies
+      )).flatMap { app =>
         // necessary because of case class limitations (good for another 21 fields)
         case class ExtraFields(
+          maybePorts: Option[Seq[Integer]],
           upgradeStrategy: UpgradeStrategy,
           labels: Map[String, String],
           acceptedResourceRoles: Option[Set[String]],
@@ -478,15 +488,24 @@ trait V2Formats {
 
         val extraReads: Reads[ExtraFields] =
           (
+            (__ \ "ports").readNullable[Seq[Integer]](uniquePorts) ~
             (__ \ "upgradeStrategy").readNullable[UpgradeStrategy].withDefault(AppDefinition.DefaultUpgradeStrategy) ~
             (__ \ "labels").readNullable[Map[String, String]].withDefault(AppDefinition.DefaultLabels) ~
             (__ \ "acceptedResourceRoles").readNullable[Set[String]](nonEmpty) ~
             (__ \ "ipAddress").readNullable[IpAddress] ~
             (__ \ "version").readNullable[Timestamp].withDefault(Timestamp.now())
           )(ExtraFields)
+            .filter(ValidationError("You cannot specify both an IP address and ports")) { extra =>
+              extra.maybePorts.forall(_.isEmpty) || extra.ipAddress.isEmpty
+            }
 
         extraReads.map { extraFields =>
+          // Normally, our default is one port. If an ipAddress is defined that would lead to an error
+          // if left unchanged.
+          def defaultPorts: Seq[Integer] = if (extraFields.ipAddress.isDefined) Nil else AppDefinition.DefaultPorts
+
           app.copy(
+            ports = extraFields.maybePorts.getOrElse(defaultPorts),
             upgradeStrategy = extraFields.upgradeStrategy,
             labels = extraFields.labels,
             acceptedResourceRoles = extraFields.acceptedResourceRoles,

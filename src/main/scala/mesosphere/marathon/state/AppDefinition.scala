@@ -77,6 +77,8 @@ case class AppDefinition(
 
   import mesosphere.mesos.protos.Implicits._
 
+  require(ipAddress.isEmpty || ports.isEmpty, "IP address and ports are not allowed at the same time")
+
   /**
     * Returns true if all health check port index values are in the range
     * of ths app's ports array, or if defined, the array of container
